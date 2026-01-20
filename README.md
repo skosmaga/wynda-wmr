@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/1041977842.svg)](https://doi.org/10.5281/zenodo.18316060)
+
 # WyNDA-WMR
 **Parameter Estimation for Wheeled Mobile Robots using WyNDA**
 
