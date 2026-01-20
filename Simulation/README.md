@@ -7,7 +7,7 @@ This folder contains MATLAB scripts for **Wheeled Mobile Robot (WMR) parameter e
 - **`wynda_wmr_sim.m`**  
   WyNDA-based WMR parameter estimation using simulated data.
 
-- **`wynda_wmr_sim_sin.m`**  
+- **`sin_wmr_sim.m`**  
   SINDy-based WMR parameter estimation using simulated data, used for comparison.
 
 - **`wynda_wmr_sim_change.m`**  
