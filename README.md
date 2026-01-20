@@ -8,23 +8,6 @@ This repository is created to support our manuscript submission to **Systems Sci
 
 ---
 
-## Repository Structure
-wynda-wmr/
-│
-├── simulation/
-│ ├── README.md
-│ └── Simulation scripts (.m)
-│
-├── experiment/
-│ ├── README.md
-│ ├── Experimental datasets (.xlsx)
-│ └── Experimental scripts (.m)
-│
-├── LICENSE
-└── README.md (this file)
-
----
-
 ## Citation
 
 If you use this code in your research, please cite our work:
