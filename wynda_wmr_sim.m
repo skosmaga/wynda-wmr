@@ -1,51 +1,53 @@
-%% Research code by Agus Hasan & Shinta Kosmaga
-clear all;
-close all;
+%% ============================================================
+%  Research Code
+%  Authors : Agus Hasan & Shinta Kosmaga
+%  Purpose : WMR parameter estimation using WyNDA
+%% ============================================================
+clear all; close all;
 
-%% number of variables and coefficients
+%% Number of variables and coefficients
 n = 5;
 r = 20;
 
-%% time horizon
+%% Time horizon
 tf  = 50;
 dt  = 0.05;
 t   = dt:dt:tf;
+nsteps = length(t);
 
-%% system description
+%% System description
 A = eye(n);
 C = eye(n);
 
-%% noise
-R = 0;
+%% Noise
+R = 0.15;
 
-%% state initialization
+%% State and parameter initialization
 x        = zeros(n,1);
 xbar     = x;
 y        = x;
 thetabar = zeros(r,1);
-Kfbar    = zeros(1,1);
-Krbar    = zeros(1,1);
 Ibar     = zeros(1,1);
-lfbar    = zeros(1,1);
-lrbar    = zeros(1,1);
+dfbar    = zeros(1,1);
+drbar    = zeros(1,1);
+mbar     = zeros(1,1);
 ebar     = xbar-x;
-mbar     = 0;
 
-%% true parameters
+%% True WMR parameters
 m  = 0.85613;
-lf = 0.06874;
-lr = 0.06726;
+df = 0.06874;
+dr = 0.06726;
 Kf = 0.04;
 Kr = 0.0435;
 I = 0.00794;
-l = lr+lf;
+d = dr+df;
 
-%% initial control inputs
+%% Inputs initialization
 S = 0;
 V = 0;
 B = 0;
 
-%% for plotting
+%% Data storage
 SArray         = [];
 VArray         = [];
 BArray         = [];
@@ -53,15 +55,13 @@ xArray         = [];
 xbarArray      = [];
 yArray         = [];
 thetabarArray  = [];
-KfbarArray     = [];
-KrbarArray     = [];
 IbarArray      = [];
-lfbarArray     = [];
-lrbarArray     = [];
-ebarArray      = [];
+dfbarArray     = [];
+drbarArray     = [];
 mbarArray      = [];
+ebarArray      = [];
 
-%% initializaion for estimator
+%% WyNDA Hyperparameter Initialization
 lambdav = 0.9999;
 lambdat = 0.9995;
 Rx      = 10*eye(n);
@@ -70,25 +70,25 @@ Px      = 1*eye(n);
 Pt      = 1*eye(r);
 Gamma   = 1*zeros(n,r);
 
-%% simulation
-for i=dt:dt:tf
-        
+%% WyNDA Simulation Loop
+for i=1:nsteps
+    
+    % Stored data
     VArray         = [VArray V];
     SArray         = [SArray S];
     BArray         = [BArray B];
-    xArray         = [xArray x];
-    xbarArray      = [xbarArray xbar];      
+    xArray         = [xArray x];   
     yArray         = [yArray y];
     thetabarArray  = [thetabarArray thetabar]; 
-    KfbarArray     = [KfbarArray Kfbar];
-    KrbarArray     = [KrbarArray Krbar];
+    xbarArray      = [xbarArray xbar];  
     IbarArray      = [IbarArray Ibar];
-    lfbarArray     = [lfbarArray lfbar];
-    lrbarArray     = [lrbarArray lrbar];
-    ebarArray      = [ebarArray ebar];
+    dfbarArray     = [dfbarArray dfbar];
+    drbarArray     = [drbarArray drbar];
     mbarArray      = [mbarArray mbar];
-
-    if i<15
+    ebarArray      = [ebarArray ebar];
+    
+    % Input profile
+    if i<300
         V = 0.1;
         S = -0.2;
     else
@@ -96,11 +96,11 @@ for i=dt:dt:tf
         S = 0.2;
     end
     
-    % simulate the system using Runge-Kutta
+    % Simulate the system using Runge-Kutta
     a1=2*(Kf+Kr);
-    a2=2*((lf*Kf)-(lr*Kr));
-    a3=2*((lf^2)*Kf)+((lr^2)*Kr);
-    a4=2*lf*Kf;
+    a2=2*((df*Kf)-(dr*Kr));
+    a3=2*((df^2)*Kf)+((dr^2)*Kr);
+    a4=2*df*Kf;
 
     k1=V*sin(B+x(3));
     l1=V*cos(B+x(3));
@@ -131,16 +131,18 @@ for i=dt:dt:tf
     x(3) = x(3) + (dt/6)*(m1+2*m2+2*m3+m4);
     x(4) = x(4) + (dt/6)*(n1+2*n2+2*n3+n4);
     x(5) = x(5) + (dt/6)*(o1+2*o2+2*o3+o4);
-    
+
+    % Measurement data    
     y = C*x+dt*R^2*randn(n,1);
 
+    % Approximation function
     Phi = [V*sin(B+y(3)) 0 0 0 zeros(16,1)';
         zeros(4,1)' V*cos(B+y(3)) 0 0 0 zeros(12,1)'
         zeros(8,1)' y(5) 0 0 0 zeros(8,1)'
         zeros(12,1)' y(3) y(4)/V y(5)/V S zeros(4,1)'
         zeros(16,1)' y(3) y(4)/V y(5)/V S];
 
-    % Estimation using adaptive observer
+    % Adaptive observer
     Kx = Px*C'*inv(C*Px*C'+Rx);
     Kt = Pt*Gamma'*C'*inv(C*Gamma*Pt*Gamma'*C'+Rt);
     Gamma = (eye(n)-Kx*C)*Gamma;
@@ -155,98 +157,71 @@ for i=dt:dt:tf
     Pt = (1/lambdat)*(eye(r)-Kt*C*Gamma)*Pt;
     Gamma = eye(n)*Gamma-Phi;
     
-    % estimation result
-    Kfbar = Kf;
-    Krbar = Kr;
-    mbar  = 2*Kfbar*dt/thetabar(16);
-    lfbar = (2*Krbar*l-(thetabar(15)*m/dt))/(2*Kfbar+2*Krbar);
-    lrbar = l-lfbar;
-    Ibar  = (2*Kfbar*lfbar*dt)/thetabar(20);
+    % Parameter Recovery
+    mbar  = 2*Kf*dt/thetabar(16);
+    dfbar = (2*Kr*d-(thetabar(15)*m/dt))/(2*Kf+2*Kr);
+    drbar = d-dfbar;
+    Ibar  = (2*Kf*dfbar*dt)/thetabar(20);
         
     ebar = xbar-x;
     B=unwrap(atan2(x(4),V));
 end
 
-%% final value and RMSE
+%% Final Estimation Statistics (Steady-State)
+
 mbar_avg = mean(mbarArray(850:end));
 Ibar_avg = mean(IbarArray(850:end));
-lfbar_avg = mean(lfbarArray(850:end));
-lrbar_avg = mean(lrbarArray(850:end));
+lfbar_avg = mean(dfbarArray(850:end));
+lrbar_avg = mean(drbarArray(850:end));
 
 mbarerr = sqrt(mean((mbarArray(850:end) - m).^2));
-lfbarerr = sqrt(mean((lfbarArray(850:end) - lf).^2));
-lrbarerr = sqrt(mean((lrbarArray(850:end) - lr).^2));
-Iarerr = sqrt(mean((IbarArray(850:end) - I).^2));
+Ibarerr = sqrt(mean((IbarArray(850:end) - I).^2));
+dfbarerr = sqrt(mean((dfbarArray(850:end) - df).^2));
+drbarerr = sqrt(mean((drbarArray(850:end) - dr).^2));
 
-%% plotting
+mbarerrp = mean(abs((m-mbarArray(850:end))./m)) * 100;
+dfbarerrp = mean(abs((df-dfbarArray(850:end))./df)) * 100;
+drbarerrp = mean(abs((dr-drbarArray(850:end))./dr)) * 100;
+Ibarerrp = mean(abs((I-IbarArray(850:end))./I)) * 100;
+
+%% Plotting
+
+% Parameter estimation
 figure(1)
-subplot(2,2,1)
-plot(t,(m)*ones(1,length(t)),'-','LineWidth',10);
-hold on;
-plot(t,mbarArray,':','LineWidth',10);
-set(gca,'color','white','LineWidth',3,'FontSize',12)
-legend('3D Model','WyNDA')
-grid on;
-grid minor;
-ylabel('m (kg)','FontSize',18)
-xlabel('t (s)','FontSize',18)
-ylim([-3 3])
-subplot(2,2,2)
-plot(t,I*ones(1,length(t)),'-','LineWidth',10);
-hold on;
-plot(t,IbarArray,':','LineWidth',10);
-set(gca,'color','white','LineWidth',3,'FontSize',12)
-grid on;
-grid minor;
-ylabel('Iy (kgm^2)','FontSize',18)
-xlabel('t (s)','FontSize',18)
-ylim([-0.1 0.1])
-subplot(2,2,3)
-plot(t,lf*ones(1,length(t)),'-','LineWidth',10);
-hold on;
-plot(t,lfbarArray,':','LineWidth',10);
-set(gca,'color','white','LineWidth',3,'FontSize',12)
-grid on;
-grid minor;
-ylabel('df (m)','FontSize',18)
-xlabel('t (s)','FontSize',18)
-ylim([-1 1])
-subplot(2,2,4)
-plot(t,lr*ones(1,length(t)),'-','LineWidth',10);
-hold on;
-plot(t,lrbarArray,':','LineWidth',10);
-set(gca,'color','white','LineWidth',3,'FontSize',12)
-grid on;
-grid minor;
-ylabel('lr (m)','FontSize',18)
-xlabel('t (s)','FontSize',18)
-ylim([-1 1])
 
+paramTrue = {m, I, df, dr};
+paramWy   = {mbarArray, IbarArray, dfbarArray, drbarArray};
+ylab      = {'m (kg)','I_y (kg m^2)','d_f (m)','d_r (m)'};
+ylims     = {[-3 3], [-0.1 0.1], [-1 1], [-1 1]};
+
+for i = 1:4
+    subplot(2,2,i)
+    plot(t,paramTrue{i}*ones(1,length(t)),'-','LineWidth',10); hold on;
+    plot(t,paramWy{i},':','LineWidth',10);
+    ylim(ylims{i})
+    formatAxis('t (s)', ylab{i})
+end
+
+% Input
 figure(2)
 subplot(2,1,1)
 plot(t,SArray,'-k','LineWidth',10);
-set(gca,'color','white','LineWidth',3,'FontSize',12)
-grid on;
-grid minor;
-ylabel('\gamma (rad)','FontSize',18)
-xlabel('t (s)','FontSize',18)
+formatAxis('t (s)','\gamma (rad)')
+
 subplot(2,1,2)
 plot(t,VArray,'-k','LineWidth',10);
-set(gca,'color','white','LineWidth',3,'FontSize',12)
-grid on;
-grid minor;
-ylabel('v (m/s)','FontSize',18)
-xlabel('t (s)','FontSize',18)
+formatAxis('t (s)','v (m/s)')
 
-figure(3)
-plot(xArray(2,:),xArray(1,:),'-k','LineWidth',10);
-hold on;
+figure(4)
+plot(xArray(2,:),xArray(1,:),'-k','LineWidth',10); hold on;
 plot(xbarArray(2,:),xbarArray(1,:),':','LineWidth',10);
-set(gca,'color','white','LineWidth',3,'FontSize',12)
-grid on;
-grid minor;
 legend('Eksperimen','WyNDA')
-ylabel('y (m)','FontSize',18)
-xlabel('x (m)','FontSize',18)
-ylim([-2 0.5])
-xlim([-2 0.5])
+formatAxis('x (m)','y (m)')
+xlim([-2 0.5]); ylim([-2 0.5])
+
+function formatAxis(xlab, ylab)
+    set(gca,'Color','white','LineWidth',3,'FontSize',12)
+    grid on; grid minor;
+    xlabel(xlab,'FontSize',18)
+    ylabel(ylab,'FontSize',18)
+end
